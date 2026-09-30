@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createStarterStory } from '../models/story';
 import { LocalStoryRepository } from '../repositories/storyRepository';
 import { MemoryStorageService } from '../services/storageService';
@@ -32,5 +32,56 @@ describe('story view model', () => {
     expect(viewModel.snapshot.notice).toContain('至少');
     viewModel.resetProject();
     expect(viewModel.snapshot.story?.id).toBe(createStarterStory().id);
+  });
+
+  it('surfaces save failures, keeps edits, and recovers after a successful write', () => {
+    const storage = new MemoryStorageService();
+    const viewModel = new StoryViewModel(new LocalStoryRepository(storage));
+    viewModel.initialize();
+    expect(viewModel.snapshot.saveState).toBe('saved');
+
+    const failingWrite = vi.spyOn(storage, 'write').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+
+    viewModel.addCharacter('阿洛', '修复师');
+    expect(viewModel.snapshot.saveState).toBe('saveFailed');
+    expect(viewModel.snapshot.error).toContain('保存失败');
+    expect(viewModel.snapshot.story?.characters.some((character) => character.name === '阿洛')).toBe(true);
+
+    viewModel.addScene('地下档案室', '他们找到被隐藏的航海日志。');
+    expect(viewModel.snapshot.saveState).toBe('saveFailed');
+    expect(viewModel.snapshot.error).toContain('保存失败');
+
+    failingWrite.mockRestore();
+    viewModel.addClue('罗盘上的刻痕', viewModel.snapshot.story?.scenes[0]?.id ?? '', '');
+    expect(viewModel.snapshot.saveState).toBe('saved');
+    expect(viewModel.snapshot.error).toBe('');
+  });
+
+  it('reports reset and complete failures through the same save state and supports retry', () => {
+    const storage = new MemoryStorageService();
+    const viewModel = new StoryViewModel(new LocalStoryRepository(storage));
+    viewModel.initialize();
+
+    const failingWrite = vi.spyOn(storage, 'write').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+
+    viewModel.completeProject();
+    expect(viewModel.snapshot.saveState).toBe('saveFailed');
+    expect(viewModel.snapshot.error).toContain('保存失败');
+    expect(viewModel.snapshot.notice).toBe('');
+
+    viewModel.resetProject();
+    expect(viewModel.snapshot.saveState).toBe('saveFailed');
+    expect(viewModel.snapshot.error).toContain('保存失败');
+    expect(viewModel.snapshot.notice).toBe('');
+    expect(viewModel.snapshot.story?.id).toBe(createStarterStory().id);
+
+    failingWrite.mockRestore();
+    viewModel.retrySave();
+    expect(viewModel.snapshot.saveState).toBe('saved');
+    expect(viewModel.snapshot.error).toBe('');
   });
 });

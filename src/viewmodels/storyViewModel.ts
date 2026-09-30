@@ -11,6 +11,7 @@ import { getStats, getTimelineWarning, orderedScenes, validateName } from '../mo
 import type { StoryRepository } from '../repositories/storyRepository';
 
 export type ViewModelStatus = 'loading' | 'ready' | 'editing' | 'error' | 'completed';
+export type SaveState = 'saved' | 'saveFailed';
 
 export interface StoryViewState {
   status: ViewModelStatus;
@@ -18,6 +19,7 @@ export interface StoryViewState {
   stats: ReturnType<typeof getStats>;
   notice: string;
   error: string;
+  saveState: SaveState;
   search: string;
   activeSection: 'overview' | 'characters' | 'clues';
 }
@@ -31,6 +33,7 @@ export class StoryViewModel {
     stats: { characters: 0, scenes: 0, clues: 0, unresolvedClues: 0, completion: 0 },
     notice: '',
     error: '',
+    saveState: 'saved',
     search: '',
     activeSection: 'overview',
   };
@@ -50,7 +53,7 @@ export class StoryViewModel {
   initialize(): void {
     try {
       const story = this.repository.load();
-      this.setState({ status: story.status === 'complete' ? 'completed' : 'ready', story, stats: getStats(story), error: '' });
+      this.setState({ status: story.status === 'complete' ? 'completed' : 'ready', story, stats: getStats(story), error: '', saveState: 'saved' });
     } catch {
       this.setState({ status: 'error', error: '故事读取失败，请重置为示例项目。' });
     }
@@ -154,13 +157,28 @@ export class StoryViewModel {
 
   completeProject(): void {
     this.updateStory((story) => ({ ...story, status: 'complete' }));
-    this.setState({ status: 'completed', notice: '项目已标记为完成，仍可继续编辑' });
+    this.setState({
+      status: 'completed',
+      notice: this.state.saveState === 'saveFailed' ? '' : '项目已标记为完成，仍可继续编辑',
+    });
   }
 
   resetProject(): void {
     const story = createStarterStory();
-    this.persist(story);
-    this.setState({ status: 'ready', story, stats: getStats(story), notice: '已恢复示例项目', error: '' });
+    const saved = this.persist(story);
+    this.setState({
+      status: 'ready',
+      story,
+      stats: getStats(story),
+      notice: saved ? '已恢复示例项目' : '',
+      ...this.saveFeedback(saved),
+    });
+  }
+
+  retrySave(): void {
+    const story = this.state.story;
+    if (!story) return;
+    this.setState(this.saveFeedback(this.persist(story)));
   }
 
   get visibleCharacters(): StoryCharacter[] {
@@ -192,16 +210,28 @@ export class StoryViewModel {
 
   private updateStory(updater: (story: StoryDocument) => StoryDocument, showEditing = true): void {
     const story = updater(this.requireStory());
-    this.persist(story);
-    this.setState({ story, stats: getStats(story), status: showEditing ? 'editing' : this.state.status, error: '' });
+    const saved = this.persist(story);
+    this.setState({
+      story,
+      stats: getStats(story),
+      status: showEditing ? 'editing' : this.state.status,
+      ...this.saveFeedback(saved),
+    });
   }
 
-  private persist(story: StoryDocument): void {
+  private persist(story: StoryDocument): boolean {
     try {
       this.repository.save({ ...story, updatedAt: new Date().toISOString() });
+      return true;
     } catch {
-      this.setState({ status: 'error', error: '保存失败，但当前编辑仍保留在页面中。' });
+      return false;
     }
+  }
+
+  private saveFeedback(saved: boolean): Pick<StoryViewState, 'saveState' | 'error'> {
+    return saved
+      ? { saveState: 'saved', error: '' }
+      : { saveState: 'saveFailed', error: '保存失败：浏览器存储不可用或空间不足。当前编辑仍保留在页面中，可继续编辑或重试，存储恢复后会自动保存。' };
   }
 
   private setState(patch: Partial<StoryViewState>): void {

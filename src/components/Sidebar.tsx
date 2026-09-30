@@ -7,7 +7,8 @@ interface SidebarProps {
 }
 
 export function Sidebar({ viewModel, stats }: SidebarProps) {
-  const { story, activeSection } = viewModel.snapshot;
+  const { story, activeSection, saveState } = viewModel.snapshot;
+  const saveFailed = saveState === 'saveFailed';
   return (
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">✦</span><span>StoryArchitect</span></div>
@@ -20,7 +21,7 @@ export function Sidebar({ viewModel, stats }: SidebarProps) {
       <div className="sidebar-bottom">
         <div className="mini-progress"><div><span>结构完成度</span><b>{stats.completion}%</b></div><div className="progress-track"><span style={{ width: `${stats.completion}%` }} /></div></div>
         <button className="reset-link" onClick={() => viewModel.resetProject()}>↻ 恢复示例项目</button>
-        <span className="saved-state">● 本地自动保存</span>
+        <span className={saveFailed ? 'saved-state save-failed' : 'saved-state'}>{saveFailed ? '⚠ 保存失败 · 修改未写入本地' : '● 本地自动保存'}</span>
       </div>
     </aside>
   );
