@@ -4,7 +4,7 @@ import type { StorageService } from '../services/storageService';
 
 export interface StoryRepository {
   load(): StoryDocument;
-  save(story: StoryDocument): void;
+  save(story: StoryDocument): boolean;
 }
 
 export class LocalStoryRepository implements StoryRepository {
@@ -20,7 +20,7 @@ export class LocalStoryRepository implements StoryRepository {
     }
   }
 
-  save(story: StoryDocument): void {
-    this.storage.write(JSON.stringify(story));
+  save(story: StoryDocument): boolean {
+    return this.storage.write(JSON.stringify(story));
   }
 }

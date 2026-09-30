@@ -29,6 +29,8 @@ button { cursor: pointer; }
 .reset-link { color: #aaa49c; background: none; border: 0; text-align: left; padding: 0; font-size: 11px; }
 .reset-link:hover { color: #fff; }
 .saved-state { color: #7f9180; font: 10px 'DM Mono', monospace; }
+.saved-state-error { color: #f0a28f; background: none; border: 0; padding: 0; text-align: left; }
+.saved-state-error:hover { color: #ffc3b4; text-decoration: underline; }
 .main-content { flex: 1; min-width: 0; }
 .topbar { height: 112px; background: var(--paper); border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 44px; }
 .topbar h1 { font: 700 30px 'Playfair Display', serif; margin: 7px 0 0; letter-spacing: -.7px; }
